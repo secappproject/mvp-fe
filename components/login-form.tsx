@@ -167,6 +167,31 @@ export function LoginForm() {
                 </Field>
               </FieldGroup>
             </form>
+            <div className="mt-8 text-center text-sm">
+              <span className="text-muted-foreground">
+                Or access other portals:
+              </span>
+              <div className="flex items-center justify-center gap-4 mt-3">
+                <Button variant="outline" asChild>
+                  <a
+                    href="https://vro-fe.vercel.app"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    VRO
+                  </a>
+                </Button>
+                <Button variant="outline" asChild>
+                  <a
+                    href="https://secpanel.vercel.app"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Trisutorpro
+                  </a>
+                </Button>
+              </div>
+            </div>
           </div>
         )}
       </div>
