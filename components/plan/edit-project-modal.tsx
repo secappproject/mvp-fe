@@ -507,7 +507,7 @@ export function EditProjectModal({ project, setIsOpen }: EditProjectModalProps) 
                 onDateChange={handleNullableDateChange(
                   "planDeliveryBasicKitPanel"
                 )}
-                note="Otomatis h+7 dari Plan Start"
+                note="Otomatis h-7 dari Plan Start"
                 disabled
               />
               <NullableDatePicker
@@ -516,7 +516,7 @@ export function EditProjectModal({ project, setIsOpen }: EditProjectModalProps) 
                 onDateChange={handleNullableDateChange(
                   "planDeliveryBasicKitBusbar"
                 )}
-                note="Otomatis h+7 dari Plan Start"
+                note="Otomatis h-7 dari Plan Start"
                 disabled
               />
               <NullableDatePicker
@@ -542,7 +542,7 @@ export function EditProjectModal({ project, setIsOpen }: EditProjectModalProps) 
                 onDateChange={handleNullableDateChange(
                   "planDeliveryAccessoriesPanel"
                 )}
-                note="Otomatis h+7 dari FAT Start"
+                note="Otomatis h-7 dari FAT Start"
                 disabled
               />
               <NullableDatePicker
@@ -551,7 +551,7 @@ export function EditProjectModal({ project, setIsOpen }: EditProjectModalProps) 
                 onDateChange={handleNullableDateChange(
                   "planDeliveryAccessoriesBusbar"
                 )}
-                note="Otomatis h+7 dari FAT Start"
+                note="Otomatis h-7 dari FAT Start"
                 disabled
               />
               <NullableDatePicker
