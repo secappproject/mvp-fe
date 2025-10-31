@@ -355,7 +355,7 @@ export const columns: ColumnDef<Project>[] = [
     accessorKey: "actualDeliveryAccessoriesBusbar",
     header: ({ column }) => <DataTableColumnHeader column={column} title="Actual Accessories (Busbar)" />,
     cell: ({ row }) => 
-        row.original.planDeliveryAccessoriesBusbar
+        row.original.actualDeliveryAccessoriesBusbar
   },
   {
     id: 'derivedDeliveryStatus',
