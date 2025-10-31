@@ -5,7 +5,7 @@ export interface Project {
   id: number;
   projectName: string;
   wbs: string;
-  category: "PIX" | "MCZ";
+  category: string;
   quantity: number;
   vendorPanel: string;
   vendorBusbar: string;

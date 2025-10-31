@@ -36,7 +36,6 @@ const parseExcelDate = (dateValue: any): Date | null => {
         return parsed;
       }
     } catch (e) {
-      // Gagal parse, coba format lain di bawah
     }
   }
   if (typeof dateValue === "number") {
@@ -69,7 +68,6 @@ export function ImportExcelModal({
   };
 
   const handleDownloadTemplate = () => {
-    // Sesuai permintaan: hanya 8 kolom
     const headers = [
       "Project Name",
       "WBS",
@@ -89,8 +87,8 @@ export function ImportExcelModal({
         "Qty": 1,
         "Progress Panel": 0,
         "Status Busbar": "Punching/Bending",
-        "Plan Start": "2025-12-01", // Format YYYY-MM-DD
-        "FAT Start": "2025-12-15", // Format YYYY-MM-DD
+        "Plan Start": "2025-12-01",
+        "FAT Start": "2025-12-15",
       },
     ];
 
@@ -142,7 +140,7 @@ export function ImportExcelModal({
             return {
               projectName: row["Project Name"] || "",
               wbs: String(row["WBS"] || ""),
-              category: String(row["Category"] || ""), 
+              category: String(row["Category"] || ""),
               quantity: Number(row["Qty"] || 0),
               vendorPanel: row["Vendor Panel"] || "",
               vendorBusbar: row["Vendor Busbar"] || "",
