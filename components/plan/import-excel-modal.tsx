@@ -1,19 +1,23 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState } from "react";
+import { useAuthStore } from "@/lib/types";
+import * as XLSX from "xlsx";
+import { addDays, parseISO } from "date-fns";
 import { Button } from "@/components/ui/button";
 import {
-  Dialog, 
+  Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
   DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import * as XLSX from "xlsx";
-import { useAuthStore } from "@/lib/types";
-import { UploadCloud } from "lucide-react"; 
+import { Label } from "@/components/ui/label";
+import { Loader2, FileCheck2, Download } from "lucide-react"; // Ditambahkan Download
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
 
 interface ImportExcelModalProps {
   isOpen: boolean;
@@ -21,164 +25,315 @@ interface ImportExcelModalProps {
   onSuccess: () => void;
 }
 
-interface ExcelRowData {
-  "Project Name": string;
-  "WBS": string;
-  "Category": string;
-  "Plan Start": number | string | Date;
-  "Qty": number;
-  "Vendor Panel": string;
-  "Vendor Busbar": string;
-  "Progress Panel": number;
-  "Status Busbar": string;
-  [key: string]: unknown;
-}
+const parseExcelDate = (dateValue: any): Date | null => {
+  if (dateValue instanceof Date) {
+    return dateValue;
+  }
+  if (typeof dateValue === "string") {
+    try {
+      const parsed = parseISO(dateValue);
+      if (!isNaN(parsed.getTime())) {
+        return parsed;
+      }
+    } catch (e) {
+      // Gagal parse, coba format lain di bawah
+    }
+  }
+  if (typeof dateValue === "number") {
+    const excelEpoch = new Date(1899, 11, 30);
+    return new Date(excelEpoch.getTime() + dateValue * 24 * 60 * 60 * 1000);
+  }
+  return null;
+};
 
-export function ImportExcelModal({ isOpen, onClose, onSuccess }: ImportExcelModalProps) {
-  const [selectedFile, setSelectedFile] = useState<File | null>(null); 
-  const [isUploading, setIsUploading] = useState(false); 
-  const [error, setError] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+const formatDateForPayload = (date: Date | null | undefined): string | null => {
+  if (!date) return null;
+  return date.toISOString().split("T")[0];
+};
+
+export function ImportExcelModal({
+  isOpen,
+  onClose,
+  onSuccess,
+}: ImportExcelModalProps) {
+  const [file, setFile] = useState<File | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [basicKitOffset, setBasicKitOffset] = useState<number>(7);
+  const [accessoriesOffset, setAccessoriesOffset] = useState<number>(7);
+  const role = useAuthStore((state) => state.role);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      setSelectedFile(e.target.files[0]);
-      setError(null);
+    if (e.target.files && e.target.files[0]) {
+      setFile(e.target.files[0]);
     }
   };
 
-  const handleUpload = async () => {
-    if (!selectedFile) {
-      setError("Silakan pilih file Excel terlebih dahulu."); 
+  // --- FUNGSI BARU UNTUK DOWNLOAD TEMPLATE ---
+  const handleDownloadTemplate = () => {
+    const headers = [
+      "Project Name",
+      "WBS",
+      "Category",
+      "Qty",
+      "Vendor Panel",
+      "Vendor Busbar",
+      "Progress Panel",
+      "Status Busbar",
+      "Plan Start",
+      "FAT Start",
+      "Plan Basic Kit (Panel)",
+      "Plan Basic Kit (Busbar)",
+      "Actual Basic Kit (Panel)",
+      "Actual Basic Kit (Busbar)",
+      "Plan Accessories (Panel)",
+      "Plan Accessories (Busbar)",
+      "Actual Accessories (Panel)",
+      "Actual Accessories (Busbar)",
+    ];
+
+    // Data contoh untuk memandu pengguna
+    const sampleData = [
+      {
+        "Project Name": "Contoh Proyek",
+        "WBS": "WBS-12345",
+        "Category": "PIX",
+        "Qty": 1,
+        "Vendor Panel": "Vendor A",
+        "Vendor Busbar": "Vendor B",
+        "Progress Panel": 0,
+        "Status Busbar": "Punching/Bending",
+        "Plan Start": "2025-12-01", // Format YYYY-MM-DD
+        "FAT Start": "2025-12-15", // Format YYYY-MM-DD
+        "Plan Basic Kit (Panel)": "", // Kosongkan agar dihitung otomatis dari offset
+        "Plan Basic Kit (Busbar)": "",
+        "Actual Basic Kit (Panel)": "",
+        "Actual Basic Kit (Busbar)": "",
+        "Plan Accessories (Panel)": "", // Kosongkan agar dihitung otomatis dari offset
+        "Plan Accessories (Busbar)": "",
+        "Actual Accessories (Panel)": "",
+        "Actual Accessories (Busbar)": "",
+      },
+    ];
+
+    const worksheet = XLSX.utils.json_to_sheet(sampleData, { header: headers });
+
+    // Atur lebar kolom (opsional)
+    worksheet["!cols"] = headers.map((h) => ({ wch: h.length + 5 }));
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Template Proyek");
+
+    XLSX.writeFile(workbook, "Template_Impor_Proyek.xlsx");
+  };
+  // --- BATAS FUNGSI BARU ---
+
+  const handleImport = async () => {
+    if (!file) {
+      alert("Silakan pilih file Excel terlebih dahulu.");
       return;
     }
+    setIsLoading(true);
 
-    setIsUploading(true);
-    setError(null);
-
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      try {
-        const data = event.target?.result;
-        const workbook = XLSX.read(data, { type: "binary", cellDates: true });
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        const json = XLSX.utils.sheet_to_json<ExcelRowData>(worksheet);
-
-        const transformedJson = json.map((row: ExcelRowData) => ({
-          projectName: row["Project Name"] ?? "",
-          wbs: row["WBS"] ?? "",
-          category: row["Category"] ?? "PIX",
-          planStart: excelDateToJSDate(row["Plan Start"]),
-          quantity: row["Qty"] ?? 0,
-          vendorPanel: row["Vendor Panel"] ?? "",
-          vendorBusbar: row["Vendor Busbar"] ?? "",
-          panelProgress: row["Progress Panel"] ?? 0,
-          statusBusbar: row["Status Busbar"] ?? "Punching/Bending",
-        }));
-
-        const role = useAuthStore.getState().role;
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/projects/bulk`, {
-          method: "POST",
-          headers: {
-              "Content-Type": "application/json",
-              "X-User-Role": role || '',
-          },
-          body: JSON.stringify(transformedJson),
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || "Gagal mengimpor data.");
-        }
-
-        onSuccess(); 
-        onClose();
-      } catch (error) {
-        console.error("Error importing data:", error);
-        setError(error instanceof Error ? error.message : "Terjadi kesalahan saat impor."); 
-      } finally {
-        setIsUploading(false);
-        setSelectedFile(null);
-        if(fileInputRef.current) fileInputRef.current.value = "";
-      }
-    };
-
-    reader.readAsBinaryString(selectedFile);
-  };
-
-  const excelDateToJSDate = (serialOrDate: number | string | Date | undefined | null): string | null => {
-    if (serialOrDate instanceof Date) {
-        const date = serialOrDate;
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
-    } else if (typeof serialOrDate === 'number') {
-        const utc_days  = Math.floor(serialOrDate - 25569);
-        const utc_value = utc_days * 86400;
-        const date_info = new Date(utc_value * 1000);
-        const fractional_day = serialOrDate - Math.floor(serialOrDate) + 0.0000001;
-        let total_seconds = Math.floor(86400 * fractional_day);
-        const seconds = total_seconds % 60;
-        total_seconds -= seconds;
-        const hours = Math.floor(total_seconds / (60 * 60));
-        const minutes = Math.floor(total_seconds / 60) % 60;
-        const date = new Date(date_info.getFullYear(), date_info.getMonth(), date_info.getDate(), hours, minutes, seconds);
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
-    } else if (typeof serialOrDate === 'string') {
+    try {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
         try {
-            const date = new Date(serialOrDate);
-            if (!isNaN(date.getTime())) {
-                const year = date.getFullYear();
-                const month = String(date.getMonth() + 1).padStart(2, '0');
-                const day = String(date.getDate()).padStart(2, '0');
-                return `${year}-${month}-${day}`;
-            }
-        } catch {}
-    }
-    return null;
-  }
+          const data = new Uint8Array(e.target?.result as ArrayBuffer);
+          const workbook = XLSX.read(data, { type: "array", cellDates: true });
+          const sheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[sheetName];
+          const sheetData: any[] = XLSX.utils.sheet_to_json(worksheet);
 
+          const projectsPayload = sheetData.map((row) => {
+            const planStart = parseExcelDate(row["Plan Start"]);
+            const fatStart = parseExcelDate(row["FAT Start"]);
+
+            const planBasicKit =
+              parseExcelDate(row["Plan Basic Kit (Panel)"]) ||
+              parseExcelDate(row["Plan Basic Kit (Busbar)"]);
+            const planAccessories =
+              parseExcelDate(row["Plan Accessories (Panel)"]) ||
+              parseExcelDate(row["Plan Accessories (Busbar)"]);
+
+            const finalPlanBasicKit =
+              planBasicKit ??
+              (planStart ? addDays(planStart, -basicKitOffset) : null);
+            const finalPlanAccessories =
+              planAccessories ??
+              (fatStart ? addDays(fatStart, -accessoriesOffset) : null);
+
+            return {
+              projectName: row["Project Name"] || "",
+              wbs: String(row["WBS"] || ""),
+              category: row["Category"] || "PIX",
+              quantity: Number(row["Qty"] || 0),
+              vendorPanel: row["Vendor Panel"] || "",
+              vendorBusbar: row["Vendor Busbar"] || "",
+              panelProgress: Number(row["Progress Panel"] || 0),
+              statusBusbar: row["Status Busbar"] || "Punching/Bending",
+              planStart: formatDateForPayload(planStart),
+              fatStart: formatDateForPayload(fatStart),
+              planDeliveryBasicKitPanel:
+                formatDateForPayload(finalPlanBasicKit),
+              planDeliveryBasicKitBusbar:
+                formatDateForPayload(finalPlanBasicKit),
+              actualDeliveryBasicKitPanel: formatDateForPayload(
+                parseExcelDate(row["Actual Basic Kit (Panel)"])
+              ),
+              actualDeliveryBasicKitBusbar: formatDateForPayload(
+                parseExcelDate(row["Actual Basic Kit (Busbar)"])
+              ),
+              planDeliveryAccessoriesPanel: formatDateForPayload(
+                finalPlanAccessories
+              ),
+              planDeliveryAccessoriesBusbar: formatDateForPayload(
+                finalPlanAccessories
+              ),
+              actualDeliveryAccessoriesPanel: formatDateForPayload(
+                parseExcelDate(row["Actual Accessories (Panel)"])
+              ),
+              actualDeliveryAccessoriesBusbar: formatDateForPayload(
+                parseExcelDate(row["Actual Accessories (Busbar)"])
+              ),
+            };
+          });
+
+          const response = await fetch(
+            `${process.env.NEXT_PUBLIC_API_URL}/api/projects/bulk`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "X-User-Role": role || "",
+              },
+              body: JSON.stringify(projectsPayload),
+            }
+          );
+
+          setIsLoading(false);
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(
+              errorData.error || "Gagal mengimpor data proyek."
+            );
+          }
+
+          alert("Data berhasil diimpor.");
+          onSuccess();
+        } catch (err) {
+          setIsLoading(false);
+          console.error("Error processing file:", err);
+          alert(
+            err instanceof Error ? err.message : "Terjadi kesalahan saat impor."
+          );
+        }
+      };
+
+      reader.onerror = () => {
+        setIsLoading(false);
+        alert("Gagal membaca file.");
+      };
+
+      reader.readAsArrayBuffer(file);
+    } catch (err) {
+      setIsLoading(false);
+      console.error("Error reading file:", err);
+      alert(err instanceof Error ? err.message : "Gagal membaca file.");
+    }
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Impor Data dari Excel</DialogTitle>
-        </DialogHeader>
-        
-        <div className="grid gap-4 py-4">
-          <div
-            className="flex flex-col items-center justify-center p-8 border-2 border-dashed rounded-lg cursor-pointer hover:border-primary/60"
-            onClick={() => fileInputRef.current?.click()}
+          <DialogTitle>Impor Data Proyek dari Excel</DialogTitle>
+          <DialogDescription>
+            Unggah file Excel (.xlsx) untuk menambah atau memperbarui data
+            proyek secara massal.
+          </DialogDescription>
+          {/* --- TOMBOL DOWNLOAD TEMPLATE --- */}
+          <Button
+            variant="link"
+            size="sm"
+            onClick={handleDownloadTemplate}
+            className="justify-start p-0 h-auto text-primary"
           >
-            <UploadCloud className="w-8 h-8 text-muted-foreground" />
-            <p className="mt-2 font-medium">
-              {selectedFile ? selectedFile.name : "Klik untuk memilih file"}
+            <Download className="w-4 h-4 mr-2" />
+            Unduh Templat Impor
+          </Button>
+          {/* --- BATAS TOMBOL --- */}
+        </DialogHeader>
+
+        <ScrollArea className="max-h-[60vh] pr-6">
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-1 gap-2">
+              <Label htmlFor="file">File Excel (.xlsx)</Label>
+              <Input
+                id="file"
+                type="file"
+                accept=".xlsx"
+                onChange={handleFileChange}
+                disabled={isLoading}
+              />
+              {file && (
+                <div className="text-sm text-muted-foreground flex items-center">
+                  <FileCheck2 className="w-4 h-4 mr-2 text-green-600" />
+                  {file.name}
+                </div>
+              )}
+            </div>
+
+            <Separator className="my-4" />
+
+            <h4 className="font-semibold text-sm">Pengaturan Offset</h4>
+            <p className="text-xs text-muted-foreground -mt-3">
+              Jika tanggal plan (Basic Kit/Accessories) kosong di Excel, tanggal
+              akan dihitung otomatis menggunakan offset ini.
             </p>
-            <p className="text-sm text-muted-foreground">File .xlsx atau .xls</p>
+
+            <div className="grid grid-cols-2 items-center gap-4">
+              <Label htmlFor="basicKitOffset" className="text-left">
+                Offset Basic Kit (H-)
+              </Label>
+              <Input
+                id="basicKitOffset"
+                type="number"
+                value={basicKitOffset}
+                onChange={(e) =>
+                  setBasicKitOffset(parseInt(e.target.value) || 0)
+                }
+                disabled={isLoading}
+                className="col-span-1"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 items-center gap-4">
+              <Label htmlFor="accessoriesOffset" className="text-left">
+                Offset Accessories (H-)
+              </Label>
+              <Input
+                id="accessoriesOffset"
+                type="number"
+                value={accessoriesOffset}
+                onChange={(e) =>
+                  setAccessoriesOffset(parseInt(e.target.value) || 0)
+                }
+                disabled={isLoading}
+                className="col-span-1"
+              />
+            </div>
           </div>
-          <Input
-            id="excel-file"
-            type="file"
-            ref={fileInputRef}
-            className="sr-only"
-            onChange={handleFileChange}
-            accept=".xlsx, .xls"
-          />
-          {error && <p className="text-sm text-destructive text-center">{error}</p>}
-        </div>
-        
+        </ScrollArea>
+
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={isUploading}>
+          <Button variant="outline" onClick={onClose} disabled={isLoading}>
             Batal
           </Button>
-          <Button onClick={handleUpload} disabled={isUploading || !selectedFile}>
-            {isUploading ? "Mengimpor..." : "Impor Data"}
+          <Button onClick={handleImport} disabled={isLoading || !file}>
+            {isLoading ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : null}
+            Impor
           </Button>
         </DialogFooter>
       </DialogContent>
