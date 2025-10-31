@@ -132,7 +132,7 @@ function TableFab({ data }: TableFabProps) {
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="secondary" className="rounded-full h-14 w-44">
-              <FileSpreadsheet className="mr-2 h-4 w-4 text-[#008A15]" />
+              <FileSpreadsheet className="mr-2 h-4 w-4" />
               <span className="text-black">Mass Data</span>
             </Button>
           </DropdownMenuTrigger>
@@ -378,7 +378,7 @@ export function DataTable<TData extends Project, TValue>({ columns, data }: Data
               checked={showOldClosed}
               onCheckedChange={(checked) => setShowOldClosed(checked as boolean)}
             />
-            <Label htmlFor="show-old-closed" className="text-sm text-black text-muted-foreground">
+            <Label htmlFor="show-old-closed" className="text-sm font-light">
               Include 2+ Days Closed
             </Label>
           </div>

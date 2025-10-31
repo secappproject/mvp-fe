@@ -22,11 +22,37 @@ interface DataTableColumnHeaderProps<TData, TValue> extends React.HTMLAttributes
 }
 
 export function DataTableColumnHeader<TData, TValue>({ column, title, className }: DataTableColumnHeaderProps<TData, TValue>) {
-  const uniqueValues = Array.from(column.getFacetedUniqueValues().keys()).sort();
+  
+  let uniqueValues = Array.from(column.getFacetedUniqueValues().keys());
+
+  if (column.id === 'vendorsMerged' || column.id === 'projectDetails' || column.id === 'actualBasicKit' || column.id === 'actualAccessories' || column.id === 'planMerged') {
+      const allValues = new Set<string>();
+      uniqueValues.forEach(val => {
+          if (typeof val === 'string' && val.includes(' | ')) {
+              val.split(' | ').forEach(v => {
+                const trimmedV = v.trim();
+                if (trimmedV && trimmedV !== 'null' && trimmedV !== '-' && trimmedV !== 'undefined') {
+                    allValues.add(trimmedV);
+                } else if (trimmedV === '-' || trimmedV === '') {
+                    allValues.add('(Kosong)');
+                }
+              });
+          } else if (val) {
+              const trimmedVal = String(val).trim();
+              if (trimmedVal && trimmedVal !== 'null' && trimmedVal !== 'undefined') {
+                  allValues.add(trimmedVal);
+              }
+          }
+      });
+      uniqueValues = Array.from(allValues).sort(); 
+  } else {
+    uniqueValues.sort();
+  }
+
   const selectedValues = new Set(column.getFilterValue() as string[]);
 
   const getDisplayValue = (val: unknown): string => {
-    if (val === null || val === undefined) {
+    if (val === null || val === undefined || val === '') {
       return "(Kosong)";
     }
     if (typeof val === 'object' && val !== null && 'Valid' in val && 'String' in val) {
@@ -57,7 +83,7 @@ export function DataTableColumnHeader<TData, TValue>({ column, title, className 
 
   const uniqueOptions = Array.from(
     new Map(optionsWithKeys.map((item) => [item.key, item])).values()
-  );
+  ).filter(option => option.displayValue !== ''); 
 
   return (
     <div className={cn("flex items-center space-x-2", className)}>
@@ -81,15 +107,17 @@ export function DataTableColumnHeader<TData, TValue>({ column, title, className 
                 <CommandEmpty>No results found.</CommandEmpty>
                 <CommandGroup>
                   {uniqueOptions.map((option) => {
-                    const isSelected = selectedValues.has(option.displayValue);
+                    const displayValueForCheck = option.displayValue;
+                    const isSelected = selectedValues.has(displayValueForCheck);
+                    
                     return (
                       <CommandItem
                         key={option.key}
                         onSelect={() => {
                           if (isSelected) {
-                            selectedValues.delete(option.displayValue);
+                            selectedValues.delete(displayValueForCheck);
                           } else {
-                            selectedValues.add(option.displayValue);
+                            selectedValues.add(displayValueForCheck);
                           }
                           const filterValues = Array.from(selectedValues);
                           column.setFilterValue(filterValues.length ? filterValues : undefined);

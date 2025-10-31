@@ -59,9 +59,8 @@ export const getDeliveryStatus = (
 };
 
 
-// --- FUNGSI RENDER BARU UNTUK MENGGABUNGKAN STATUS ---
 const renderMergedPlanDateWithStatusChip = (
-    planDateStr: string | null, // Asumsi planDatePanel dan planDateBusbar SAMA
+    planDateStr: string | null, 
     actualDatePanel: string | null,
     actualDateBusbar: string | null
 ) => {
@@ -70,52 +69,44 @@ const renderMergedPlanDateWithStatusChip = (
         return <span>{formattedPlanDate}</span>;
     }
 
-    // Dapatkan status untuk kedua item
     const statusPanel = getDeliveryStatus(planDateStr, actualDatePanel);
     const statusBusbar = getDeliveryStatus(planDateStr, actualDateBusbar);
 
     let finalStatus: "Late" | "Need Delivery" | "On Track" | null = null;
 
-    // Logika penggabungan:
-    // 1. Jika SALAH SATU telat, status gabungan adalah "Late"
     if (statusPanel === "Late" || statusBusbar === "Late") {
         finalStatus = "Late";
     } 
-    // 2. Jika tidak ada yang telat, TAPI SALAH SATU "Need Delivery"
     else if (statusPanel === "Need Delivery" || statusBusbar === "Need Delivery") {
         finalStatus = "Need Delivery";
     }
-    // 3. Jika keduanya "Delivered" atau "On Track" (atau kombinasinya)
     else if ((statusPanel === "Delivered" || statusPanel === "On Track") &&
              (statusBusbar === "Delivered" || statusBusbar === "On Track")) {
         finalStatus = "On Track";
     }
-    // 4. Khusus untuk kasus di mana KEDUANYA sudah terkirim (Delivered)
     if (statusPanel === "Delivered" && statusBusbar === "Delivered") {
-        finalStatus = "On Track"; // Tetap "On Track" (hijau)
+        finalStatus = "On Track"; 
     }
 
     let statusChip: React.ReactNode = null;
 
     if (finalStatus === "Late") { 
-        statusChip = <span className="ml-2 px-2 py-0.5 text-xs font-semibold rounded-full bg-red-100 text-red-700">Late</span>
+        statusChip = <span className="ml-2 px-2 py-0.5 text-xs font-light rounded-full bg-red-100 text-red-700">Late</span>
     } else if (finalStatus === "Need Delivery") {
-        statusChip = <span className="ml-2 px-2 py-0.5 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">Need Delivery</span>;
+        statusChip = <span className="ml-2 px-2 py-0.5 text-xs font-light rounded-full bg-yellow-100 text-yellow-800">Need Delivery</span>;
     } else if (finalStatus === "On Track") { 
-        statusChip = <span className="ml-2 px-2 py-0.5 text-xs font-semibold rounded-full bg-green-100 text-green-800">On Track</span>;
+        statusChip = <span className="ml-2 px-2 py-0.5 text-xs font-light rounded-full bg-green-100 text-green-800">On Track</span>;
     }
 
     return (
-        <div className="flex items-center">
-            <span>{formattedPlanDate}</span>
-            {statusChip}
+        <div className="items-start ml-1">
+            <span> {formattedPlanDate}</span>
+            <span>{statusChip}</span>
         </div>
     );
 };
-// --- BATAS FUNGSI BARU ---
 
 
-// --- FUNGSI FILTER BARU UNTUK KOLOM GABUNGAN ---
 export const filterByDeliveryStatus: FilterFn<Project> = (row, columnId, filterValue: string[]) => {
     if (!filterValue || filterValue.length === 0) return true;
 
@@ -124,7 +115,6 @@ export const filterByDeliveryStatus: FilterFn<Project> = (row, columnId, filterV
     
     let itemsToCompare: { plan: string | null; actual: string | null; }[] = [];
 
-    // Tentukan item mana yang akan dicek berdasarkan ID kolom
     if (columnId === "planBasicKit") {
         itemsToCompare = [
             { plan: project.planDeliveryBasicKitPanel, actual: project.actualDeliveryBasicKitPanel },
@@ -136,10 +126,9 @@ export const filterByDeliveryStatus: FilterFn<Project> = (row, columnId, filterV
             { plan: project.planDeliveryAccessoriesBusbar, actual: project.actualDeliveryAccessoriesBusbar }
         ];
     } else {
-        return true; // Fallback jika ID kolom tidak cocok
+        return true; 
     }
 
-    // Logika filter yang sama seperti sebelumnya, tapi hanya pada item yang relevan
     for (const item of itemsToCompare) {
         if (!item.actual) {
             statuses.push(getDeliveryStatus(item.plan, null));
@@ -168,8 +157,59 @@ export const filterByDeliveryStatus: FilterFn<Project> = (row, columnId, filterV
 
     return statuses.some(status => status && filterValue.includes(status));
 };
-// --- BATAS FUNGSI FILTER BARU ---
 
+export const filterByMergedVendors: FilterFn<Project> = (row, _columnId, filterValues: string[]) => {
+    if (!filterValues || filterValues.length === 0) return true;
+    
+    const panel = String(row.original.vendorPanel).toLowerCase();
+    const busbar = String(row.original.vendorBusbar).toLowerCase();
+    
+    return filterValues.some((filterValue: string) => {
+        const value = filterValue.toLowerCase();
+        return panel.includes(value) || busbar.includes(value);
+    });
+};
+
+export const filterByProjectDetails: FilterFn<Project> = (row, _columnId, filterValues: string[]) => {
+    if (!filterValues || filterValues.length === 0) return true;
+    
+    const wbs = String(row.original.wbs);
+    const name = String(row.original.projectName);
+    const category = String(row.original.category);
+    
+    return filterValues.some((filterValue: string) => {
+        const value = filterValue.toLowerCase();
+        return wbs.toLowerCase() === value || name.toLowerCase() === value || category.toLowerCase() === value;
+    });
+};
+
+export const filterByActualDelivery: FilterFn<Project> = (row, columnId, filterValues: string[]) => {
+    if (!filterValues || filterValues.length === 0) return true;
+    
+    let datesToCompare: (string | null)[] = [];
+
+    if (columnId === "actualBasicKit") {
+        datesToCompare = [row.original.actualDeliveryBasicKitPanel, row.original.actualDeliveryBasicKitBusbar];
+    } else if (columnId === "actualAccessories") {
+        datesToCompare = [row.original.actualDeliveryAccessoriesPanel, row.original.actualDeliveryAccessoriesBusbar];
+    } else {
+        return true; 
+    }
+
+    return filterValues.some(filterValue => {
+        const value = filterValue === "(Kosong)" ? null : filterValue;
+        
+        return datesToCompare.some(dateStr => {
+            const formattedDate = dateStr ? formatDate(dateStr) : null;
+            if (value === null) {
+                // Filter Kosong
+                return formattedDate === null || formattedDate === '';
+            }
+            // Filter Tanggal
+            return formattedDate === value;
+        });
+    });
+};
 
 export const columns: ColumnDef<Project>[] = [
   {
@@ -177,36 +217,21 @@ export const columns: ColumnDef<Project>[] = [
     header: "No.",
     cell: ({ row }) => row.index + 1,
   },
+  
   {
-    accessorKey: "wbs",  filterFn: (row, id, filterValues) => {
-    if (!filterValues || filterValues.length === 0) return true;
-    const cellValue = String(row.getValue(id)).toLowerCase();
-    return filterValues.some((value: string) =>
-      cellValue.includes(value.toLowerCase())
-    );
+    id: "projectDetails",
+    header: ({ column }) => <DataTableColumnHeader column={column} title="WBS / Proyek / Kategori" />,
+    accessorFn: (row) => [row.wbs, row.projectName, row.category].filter(Boolean).join(' | '),
+    cell: ({ row }) => (
+        <div className="flex flex-col text-xs space-y-0.5">
+            <span className="font-medium text-sm">{row.original.projectName}</span>
+            <span className="font-light">WBS: {row.original.wbs || '-'}</span>
+            <span className="font-light">Kategori: {row.original.category || '-'}</span>
+        </div>
+    ),
+    filterFn: filterByProjectDetails,
   },
-    header: ({ column }) => <DataTableColumnHeader column={column} title="WBS" />,
-  },
-  {
-    accessorKey: "projectName",  filterFn: (row, id, filterValues) => {
-    if (!filterValues || filterValues.length === 0) return true;
-    const cellValue = String(row.getValue(id)).toLowerCase();
-    return filterValues.some((value: string) =>
-      cellValue.includes(value.toLowerCase())
-    );
-  },
-    header: ({ column }) => <DataTableColumnHeader column={column} title="Project Name" />,
-  },
-  {
-    accessorKey: "category",  filterFn: (row, id, filterValues) => {
-    if (!filterValues || filterValues.length === 0) return true;
-    const cellValue = String(row.getValue(id)).toLowerCase();
-    return filterValues.some((value: string) =>
-      cellValue.includes(value.toLowerCase())
-    );
-  },
-    header: ({ column }) => <DataTableColumnHeader column={column} title="Category" />,
-  },
+
   {
     accessorKey: "quantity",
     header: ({ column }) => <DataTableColumnHeader column={column} title="Qty" />,
@@ -217,17 +242,24 @@ export const columns: ColumnDef<Project>[] = [
       }
       return filterValues.some((v) => cellValue === Number(v));
     },
+    cell: ({ row }) => (
+       <span className="text-sm">{row.original.quantity}</span>
+    ),
   },
+  
   {
-    accessorKey: "vendorPanel",  filterFn: (row, id, filterValues) => {
-    if (!filterValues || filterValues.length === 0) return true;
-    const cellValue = String(row.getValue(id)).toLowerCase();
-    return filterValues.some((value: string) =>
-      cellValue.includes(value.toLowerCase())
-    );
+    id: "vendorsMerged",
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Vendor" />,
+    accessorFn: (row) => [row.vendorPanel, row.vendorBusbar].filter(Boolean).join(' | '), 
+    cell: ({ row }) => (
+        <div className="flex flex-col text-xs space-y-0.5">
+            <span className="font-light">Panel: {row.original.vendorPanel || '-'}</span>
+            <span className="font-light">Busbar: {row.original.vendorBusbar || '-'}</span>
+        </div>
+    ),
+    filterFn: filterByMergedVendors, 
   },
-    header: ({ column }) => <DataTableColumnHeader column={column} title="Vendor Panel" />,
-  },
+
   {
     accessorKey: "panelProgress",
     filterFn: (row, id, filterValues) => {
@@ -238,7 +270,7 @@ export const columns: ColumnDef<Project>[] = [
       return filterValues.some((v) => cellValue === Number(v));
     },
 
-    header: ({ column }) => <DataTableColumnHeader column={column} title="Progress Panel" />,
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Progress" />,
     cell: ({ row }) => {
       const progress: number = row.original.panelProgress;
       
@@ -278,16 +310,6 @@ export const columns: ColumnDef<Project>[] = [
     },
   },
   {
-    accessorKey: "vendorBusbar",  filterFn: (row, id, filterValues) => {
-    if (!filterValues || filterValues.length === 0) return true;
-    const cellValue = String(row.getValue(id)).toLowerCase();
-    return filterValues.some((value: string) =>
-      cellValue.includes(value.toLowerCase())
-    );
-  },
-    header: ({ column }) => <DataTableColumnHeader column={column} title="Vendor Busbar" />,
-  },
-  {
     accessorKey: "statusBusbar",
     header: ({ column }) => <DataTableColumnHeader column={column} title="Status Busbar" />,
     filterFn: (row, id, filterValues) => {
@@ -308,73 +330,66 @@ export const columns: ColumnDef<Project>[] = [
         default: statusText = "Done"; statusIcon = iconDone; break;
       }
       return (
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center text-xs space-x-2">
           <span>{statusText}</span>
           <Image src={statusIcon} alt={statusText} width={24} height={24} priority={false} />
         </div>
       );
     },
   },
+  
   {
-    accessorKey: "planStart",
-    header: ({ column }) => <DataTableColumnHeader column={column} title="Plan Start (All)" />,
-    cell: ({ row }) => formatDate(row.original.planStart),
-  },
-
-{
-    id: "planBasicKit",
-    header: ({ column }) => <DataTableColumnHeader column={column} title="Plan Basic Kit" />,
-    accessorFn: (row) => row.planDeliveryBasicKitPanel,
-    cell: ({ row }) => renderMergedPlanDateWithStatusChip(
-        row.original.planDeliveryBasicKitPanel, 
-        row.original.actualDeliveryBasicKitPanel,
-        row.original.actualDeliveryBasicKitBusbar
+    id: "planMerged",
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Plan" />,
+    accessorFn: (row) => [formatDate(row.planStart), formatDate(row.planDeliveryBasicKitPanel), formatDate(row.planDeliveryAccessoriesPanel)].filter(Boolean).join(' | '),
+    cell: ({ row }) => (
+        <div className="flex flex-col text-xs space-y-3">
+            <span className="font-light">Start: {formatDate(row.original.planStart) || '-'}</span>
+            <span className="font-light flex">BK Plan: {renderMergedPlanDateWithStatusChip(row.original.planDeliveryBasicKitPanel, row.original.actualDeliveryBasicKitPanel, row.original.actualDeliveryBasicKitBusbar)}</span>
+            <span className="font-light flex">Acc Plan: {renderMergedPlanDateWithStatusChip(row.original.planDeliveryAccessoriesPanel, row.original.actualDeliveryAccessoriesPanel, row.original.actualDeliveryAccessoriesBusbar)}</span>
+        </div>
     ),
-    filterFn: filterByDeliveryStatus,
-    enableHiding: true, 
-},
-
-  {
-    accessorKey: "actualDeliveryBasicKitPanel",
-    header: ({ column }) => <DataTableColumnHeader column={column} title="Actual Basic Kit (Panel)" />,
-    cell: ({ row }) => row.original.actualDeliveryBasicKitPanel
-    
-  },
-  {
-    accessorKey: "actualDeliveryBasicKitBusbar",
-    header: ({ column }) => <DataTableColumnHeader column={column} title="Actual Basic Kit (Busbar)" />,
-    cell: ({ row }) => row.original.actualDeliveryBasicKitBusbar
-  },
-  {
-    accessorKey: "fatStart",
-    header: ({ column }) => <DataTableColumnHeader column={column} title="FAT Start (All)" />,
-    cell: ({ row }) => formatDate(row.original.fatStart),
+    filterFn: (row, id, filterValues) => {
+        if (!filterValues || filterValues.length === 0) return true;
+        const start = formatDate(row.original.planStart) || '(Kosong)';
+        const bk = formatDate(row.original.planDeliveryBasicKitPanel) || '(Kosong)';
+        const acc = formatDate(row.original.planDeliveryAccessoriesPanel) || '(Kosong)';
+        
+        return filterValues.some((filterValue: string) => {
+            const value = filterValue === '(Kosong)' ? '(Kosong)' : filterValue;
+            return start === value || bk === value || acc === value;
+        });
+    },
   },
 
-{
-    id: "planAccessories",
-    header: ({ column }) => <DataTableColumnHeader column={column} title="Plan Accessories" />,
-    accessorFn: (row) => row.planDeliveryAccessoriesPanel, 
-    cell: ({ row }) => renderMergedPlanDateWithStatusChip(
-        row.original.planDeliveryAccessoriesPanel, 
-        row.original.actualDeliveryAccessoriesPanel,
-        row.original.actualDeliveryAccessoriesBusbar
+  {
+    id: "actualBasicKit",
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Act. BK" />,
+    accessorFn: (row) => [formatDate(row.actualDeliveryBasicKitPanel), formatDate(row.actualDeliveryBasicKitBusbar)].filter(Boolean).join(' | '),
+    cell: ({ row }) => (
+        <div className="flex flex-col text-xs space-y-0.5">
+            <span className="font-light">Panel: {formatDate(row.original.actualDeliveryBasicKitPanel) || '-'}</span>
+            <span className="font-light">Busbar: {formatDate(row.original.actualDeliveryBasicKitBusbar) || '-'}</span>
+        </div>
     ),
-    filterFn: filterByDeliveryStatus,
+    filterFn: filterByActualDelivery,
     enableHiding: true,
-},
-  {
-    accessorKey: "actualDeliveryAccessoriesPanel",
-    header: ({ column }) => <DataTableColumnHeader column={column} title="Actual Accessories (Panel)" />,
-    cell: ({ row }) =>
-        row.original.actualDeliveryAccessoriesPanel
   },
+  
   {
-    accessorKey: "actualDeliveryAccessoriesBusbar",
-    header: ({ column }) => <DataTableColumnHeader column={column} title="Actual Accessories (Busbar)" />,
-    cell: ({ row }) => 
-        row.original.actualDeliveryAccessoriesBusbar
+    id: "actualAccessories",
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Act. Acc" />,
+    accessorFn: (row) => [formatDate(row.actualDeliveryAccessoriesPanel), formatDate(row.actualDeliveryAccessoriesBusbar)].filter(Boolean).join(' | '),
+    cell: ({ row }) => (
+        <div className="flex flex-col text-xs space-y-0.5">
+            <span className="font-light">Panel: {formatDate(row.original.actualDeliveryAccessoriesPanel) || '-'}</span>
+            <span className="font-light">Busbar: {formatDate(row.original.actualDeliveryAccessoriesBusbar) || '-'}</span>
+        </div>
+    ),
+    filterFn: filterByActualDelivery,
+    enableHiding: true,
   },
+
   {
     id: 'derivedDeliveryStatus',
     accessorFn: (row) => {
