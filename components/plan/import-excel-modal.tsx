@@ -125,8 +125,6 @@ export function ImportExcelModal({
             const planStart = parseExcelDate(row["Plan Start"]);
             const fatStart = parseExcelDate(row["FAT Start"]);
 
-            // Kolom-kolom ini akan 'undefined' jika tidak ada di template,
-            // dan itu tidak masalah
             const planBasicKit =
               parseExcelDate(row["Plan Basic Kit (Panel)"]) ||
               parseExcelDate(row["Plan Basic Kit (Busbar)"]);
@@ -134,7 +132,6 @@ export function ImportExcelModal({
               parseExcelDate(row["Plan Accessories (Panel)"]) ||
               parseExcelDate(row["Plan Accessories (Busbar)"]);
 
-            // Logika offset akan tetap berjalan
             const finalPlanBasicKit =
               planBasicKit ??
               (planStart ? addDays(planStart, -basicKitOffset) : null);
@@ -145,10 +142,10 @@ export function ImportExcelModal({
             return {
               projectName: row["Project Name"] || "",
               wbs: String(row["WBS"] || ""),
-              category: row["Category"] || "PIX",
+              category: String(row["Category"] || ""), 
               quantity: Number(row["Qty"] || 0),
-              vendorPanel: row["Vendor Panel"] || "", // Akan jadi "" jika tdk ada di Excel
-              vendorBusbar: row["Vendor Busbar"] || "", // Akan jadi "" jika tdk ada di Excel
+              vendorPanel: row["Vendor Panel"] || "",
+              vendorBusbar: row["Vendor Busbar"] || "",
               panelProgress: Number(row["Progress Panel"] || 0),
               statusBusbar: row["Status Busbar"] || "Punching/Bending",
               planStart: formatDateForPayload(planStart),
