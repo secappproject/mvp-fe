@@ -46,8 +46,7 @@ interface DataTableProps<TData, TValue> {
 type DeliveryStatus = "On Track" | "Need Delivery" | "Late";
 const deliveryStatuses: DeliveryStatus[] = ["On Track", "Need Delivery", "Late"];
 const statusFilterColumnIds = [
-    "planBasicKit",
-    "planAccessories"
+    "derivedDeliveryStatus"
 ];
 
 function TableAddButton() {

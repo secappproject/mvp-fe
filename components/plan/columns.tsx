@@ -107,55 +107,37 @@ const renderMergedPlanDateWithStatusChip = (
 };
 
 
-export const filterByDeliveryStatus: FilterFn<Project> = (row, columnId, filterValue: string[]) => {
+export const filterByDeliveryStatus: FilterFn<Project> = (row, _columnId, filterValue: string[]) => {
     if (!filterValue || filterValue.length === 0) return true;
 
     const project = row.original;
-    const statuses: (string | null)[] = []; 
     
-    let itemsToCompare: { plan: string | null; actual: string | null; }[] = [];
+    const statuses = [
+        getDeliveryStatus(project.planDeliveryBasicKitPanel, project.actualDeliveryBasicKitPanel),
+        getDeliveryStatus(project.planDeliveryBasicKitBusbar, project.actualDeliveryBasicKitBusbar),
+        getDeliveryStatus(project.planDeliveryAccessoriesPanel, project.actualDeliveryAccessoriesPanel),
+        getDeliveryStatus(project.planDeliveryAccessoriesBusbar, project.actualDeliveryAccessoriesBusbar)
+    ].filter((s): s is Exclude<typeof s, null> => s !== null);
 
-    if (columnId === "planBasicKit") {
-        itemsToCompare = [
-            { plan: project.planDeliveryBasicKitPanel, actual: project.actualDeliveryBasicKitPanel },
-            { plan: project.planDeliveryBasicKitBusbar, actual: project.actualDeliveryBasicKitBusbar }
-        ];
-    } else if (columnId === "planAccessories") {
-        itemsToCompare = [
-            { plan: project.planDeliveryAccessoriesPanel, actual: project.actualDeliveryAccessoriesPanel },
-            { plan: project.planDeliveryAccessoriesBusbar, actual: project.actualDeliveryAccessoriesBusbar }
-        ];
-    } else {
-        return true; 
+    if (statuses.length === 0) return false;
+
+    const isLate = statuses.includes("Late");
+    const isNeedDelivery = statuses.includes("Need Delivery") && !isLate;
+    const isDeliveredOrOnTrack = statuses.every(s => s === "Delivered" || s === "On Track");
+
+    if (filterValue.includes("Late")) {
+        if (isLate) return true;
     }
-
-    for (const item of itemsToCompare) {
-        if (!item.actual) {
-            statuses.push(getDeliveryStatus(item.plan, null));
-        } else if (item.plan && item.actual && filterValue.includes("Late")) {
-            try {
-                const planDate = startOfDay(parseISO(item.plan));
-                const actualDate = startOfDay(parseISO(item.actual));
-                if (isAfter(actualDate, planDate)) {
-                    statuses.push("Late");
-                }
-            } catch(e)  {}
-        } else if (item.plan && item.actual && filterValue.includes("On Track")) {
-             try {
-                const planDate = startOfDay(parseISO(item.plan));
-                const actualDate = startOfDay(parseISO(item.actual));
-                if (!isAfter(actualDate, planDate)) {
-                    statuses.push("On Track"); 
-                }
-            } catch(e)  {}
-        }
+    
+    if (filterValue.includes("Need Delivery")) {
+        if (isNeedDelivery) return true;
     }
 
     if (filterValue.includes("On Track")) {
-         return statuses.some(status => status && (filterValue.includes(status) || status === "Delivered"));
+        if (isDeliveredOrOnTrack) return true;
     }
 
-    return statuses.some(status => status && filterValue.includes(status));
+    return false;
 };
 
 export const filterByMergedVendors: FilterFn<Project> = (row, _columnId, filterValues: string[]) => {
@@ -202,14 +184,29 @@ export const filterByActualDelivery: FilterFn<Project> = (row, columnId, filterV
         return datesToCompare.some(dateStr => {
             const formattedDate = dateStr ? formatDate(dateStr) : null;
             if (value === null) {
-                // Filter Kosong
                 return formattedDate === null || formattedDate === '';
             }
-            // Filter Tanggal
             return formattedDate === value;
         });
     });
 };
+
+export const filterByPlanMerged: FilterFn<Project> = (row, _columnId, filterValues: string[]) => {
+    if (!filterValues || filterValues.length === 0) return true;
+
+    const project = row.original;
+    const dates = [
+        formatDate(project.planStart) || '(Kosong)',
+        formatDate(project.planDeliveryBasicKitPanel) || '(Kosong)',
+        formatDate(project.planDeliveryAccessoriesPanel) || '(Kosong)'
+    ];
+
+    return filterValues.some(filterValue => {
+        const targetValue = filterValue === '(Kosong)' ? '(Kosong)' : filterValue;
+        return dates.includes(targetValue);
+    });
+};
+
 
 export const columns: ColumnDef<Project>[] = [
   {
@@ -340,26 +337,16 @@ export const columns: ColumnDef<Project>[] = [
   
   {
     id: "planMerged",
-    header: ({ column }) => <DataTableColumnHeader column={column} title="Plan" />,
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Plan (Start / BK / Acc)" />,
     accessorFn: (row) => [formatDate(row.planStart), formatDate(row.planDeliveryBasicKitPanel), formatDate(row.planDeliveryAccessoriesPanel)].filter(Boolean).join(' | '),
     cell: ({ row }) => (
-        <div className="flex flex-col text-xs space-y-3">
+        <div className="flex flex-col text-xs space-y-0.5">
             <span className="font-light">Start: {formatDate(row.original.planStart) || '-'}</span>
-            <span className="font-light flex">BK Plan: {renderMergedPlanDateWithStatusChip(row.original.planDeliveryBasicKitPanel, row.original.actualDeliveryBasicKitPanel, row.original.actualDeliveryBasicKitBusbar)}</span>
-            <span className="font-light flex">Acc Plan: {renderMergedPlanDateWithStatusChip(row.original.planDeliveryAccessoriesPanel, row.original.actualDeliveryAccessoriesPanel, row.original.actualDeliveryAccessoriesBusbar)}</span>
+            <span className="font-light flex items-center">BK Plan: {renderMergedPlanDateWithStatusChip(row.original.planDeliveryBasicKitPanel, row.original.actualDeliveryBasicKitPanel, row.original.actualDeliveryBasicKitBusbar)}</span>
+            <span className="font-light flex items-center">Acc Plan: {renderMergedPlanDateWithStatusChip(row.original.planDeliveryAccessoriesPanel, row.original.actualDeliveryAccessoriesPanel, row.original.actualDeliveryAccessoriesBusbar)}</span>
         </div>
     ),
-    filterFn: (row, id, filterValues) => {
-        if (!filterValues || filterValues.length === 0) return true;
-        const start = formatDate(row.original.planStart) || '(Kosong)';
-        const bk = formatDate(row.original.planDeliveryBasicKitPanel) || '(Kosong)';
-        const acc = formatDate(row.original.planDeliveryAccessoriesPanel) || '(Kosong)';
-        
-        return filterValues.some((filterValue: string) => {
-            const value = filterValue === '(Kosong)' ? '(Kosong)' : filterValue;
-            return start === value || bk === value || acc === value;
-        });
-    },
+    filterFn: filterByPlanMerged,
   },
 
   {
