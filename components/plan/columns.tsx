@@ -59,37 +59,49 @@ export const getDeliveryStatus = (
 };
 
 
-const renderPlanDateWithStatusChip = (
-    planDateStr: string | null,
-    actualDateStr: string | null
+// --- FUNGSI RENDER BARU UNTUK MENGGABUNGKAN STATUS ---
+const renderMergedPlanDateWithStatusChip = (
+    planDateStr: string | null, // Asumsi planDatePanel dan planDateBusbar SAMA
+    actualDatePanel: string | null,
+    actualDateBusbar: string | null
 ) => {
     const formattedPlanDate = formatDate(planDateStr);
-    const status = getDeliveryStatus(planDateStr, actualDateStr); 
-    let statusChip: React.ReactNode = null;
-
     if (!planDateStr) {
         return <span>{formattedPlanDate}</span>;
     }
 
-    let isDeliveryLate = false;
-     if (planDateStr && actualDateStr) {
-        try {
-            const planDate = startOfDay(parseISO(planDateStr));
-            const actualDate = startOfDay(parseISO(actualDateStr));
-            if (isAfter(actualDate, planDate)) {
-                isDeliveryLate = true; 
-            }
-        } catch(e) { console.warn("Error comparing dates:", planDateStr, actualDateStr); }
-    }
-    
-    const showLateChipDelivered = actualDateStr && isDeliveryLate; 
-    const showLateChipUndelivered = status === "Late"; 
+    // Dapatkan status untuk kedua item
+    const statusPanel = getDeliveryStatus(planDateStr, actualDatePanel);
+    const statusBusbar = getDeliveryStatus(planDateStr, actualDateBusbar);
 
-    if (showLateChipDelivered || showLateChipUndelivered) { 
+    let finalStatus: "Late" | "Need Delivery" | "On Track" | null = null;
+
+    // Logika penggabungan:
+    // 1. Jika SALAH SATU telat, status gabungan adalah "Late"
+    if (statusPanel === "Late" || statusBusbar === "Late") {
+        finalStatus = "Late";
+    } 
+    // 2. Jika tidak ada yang telat, TAPI SALAH SATU "Need Delivery"
+    else if (statusPanel === "Need Delivery" || statusBusbar === "Need Delivery") {
+        finalStatus = "Need Delivery";
+    }
+    // 3. Jika keduanya "Delivered" atau "On Track" (atau kombinasinya)
+    else if ((statusPanel === "Delivered" || statusPanel === "On Track") &&
+             (statusBusbar === "Delivered" || statusBusbar === "On Track")) {
+        finalStatus = "On Track";
+    }
+    // 4. Khusus untuk kasus di mana KEDUANYA sudah terkirim (Delivered)
+    if (statusPanel === "Delivered" && statusBusbar === "Delivered") {
+        finalStatus = "On Track"; // Tetap "On Track" (hijau)
+    }
+
+    let statusChip: React.ReactNode = null;
+
+    if (finalStatus === "Late") { 
         statusChip = <span className="ml-2 px-2 py-0.5 text-xs font-semibold rounded-full bg-red-100 text-red-700">Late</span>
-    } else if (status === "Need Delivery") {
+    } else if (finalStatus === "Need Delivery") {
         statusChip = <span className="ml-2 px-2 py-0.5 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">Need Delivery</span>;
-    } else if (status === "On Track" || status === "Delivered") { 
+    } else if (finalStatus === "On Track") { 
         statusChip = <span className="ml-2 px-2 py-0.5 text-xs font-semibold rounded-full bg-green-100 text-green-800">On Track</span>;
     }
 
@@ -100,22 +112,35 @@ const renderPlanDateWithStatusChip = (
         </div>
     );
 };
+// --- BATAS FUNGSI BARU ---
 
 
-export const filterByDeliveryStatus: FilterFn<Project> = (row, _columnId, filterValue: string[]) => {
+// --- FUNGSI FILTER BARU UNTUK KOLOM GABUNGAN ---
+export const filterByDeliveryStatus: FilterFn<Project> = (row, columnId, filterValue: string[]) => {
     if (!filterValue || filterValue.length === 0) return true;
 
     const project = row.original;
     const statuses: (string | null)[] = []; 
+    
+    let itemsToCompare: { plan: string | null; actual: string | null; }[] = [];
 
-    const items = [
-        { plan: project.planDeliveryBasicKitPanel, actual: project.actualDeliveryBasicKitPanel },
-        { plan: project.planDeliveryBasicKitBusbar, actual: project.actualDeliveryBasicKitBusbar },
-        { plan: project.planDeliveryAccessoriesPanel, actual: project.actualDeliveryAccessoriesPanel },
-        { plan: project.planDeliveryAccessoriesBusbar, actual: project.actualDeliveryAccessoriesBusbar }
-    ];
+    // Tentukan item mana yang akan dicek berdasarkan ID kolom
+    if (columnId === "planBasicKit") {
+        itemsToCompare = [
+            { plan: project.planDeliveryBasicKitPanel, actual: project.actualDeliveryBasicKitPanel },
+            { plan: project.planDeliveryBasicKitBusbar, actual: project.actualDeliveryBasicKitBusbar }
+        ];
+    } else if (columnId === "planAccessories") {
+        itemsToCompare = [
+            { plan: project.planDeliveryAccessoriesPanel, actual: project.actualDeliveryAccessoriesPanel },
+            { plan: project.planDeliveryAccessoriesBusbar, actual: project.actualDeliveryAccessoriesBusbar }
+        ];
+    } else {
+        return true; // Fallback jika ID kolom tidak cocok
+    }
 
-    for (const item of items) {
+    // Logika filter yang sama seperti sebelumnya, tapi hanya pada item yang relevan
+    for (const item of itemsToCompare) {
         if (!item.actual) {
             statuses.push(getDeliveryStatus(item.plan, null));
         } else if (item.plan && item.actual && filterValue.includes("Late")) {
@@ -143,6 +168,8 @@ export const filterByDeliveryStatus: FilterFn<Project> = (row, _columnId, filter
 
     return statuses.some(status => status && filterValue.includes(status));
 };
+// --- BATAS FUNGSI FILTER BARU ---
+
 
 export const columns: ColumnDef<Project>[] = [
   {
@@ -293,24 +320,20 @@ export const columns: ColumnDef<Project>[] = [
     header: ({ column }) => <DataTableColumnHeader column={column} title="Plan Start (All)" />,
     cell: ({ row }) => formatDate(row.original.planStart),
   },
-  {
-    accessorKey: "planDeliveryBasicKitPanel",
-    header: ({ column }) => <DataTableColumnHeader column={column} title="Plan Basic Kit (Panel)" />,
-    cell: ({ row }) => renderPlanDateWithStatusChip(
-        row.original.planDeliveryBasicKitPanel,
-        row.original.actualDeliveryBasicKitPanel
-    ),
-    filterFn: filterByDeliveryStatus,
-  },
-  {
-    accessorKey: "planDeliveryBasicKitBusbar",
-    header: ({ column }) => <DataTableColumnHeader column={column} title="Plan Basic Kit (Busbar)" />,
-    cell: ({ row }) => renderPlanDateWithStatusChip(
-        row.original.planDeliveryBasicKitBusbar,
+
+{
+    id: "planBasicKit",
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Plan Basic Kit" />,
+    accessorFn: (row) => row.planDeliveryBasicKitPanel,
+    cell: ({ row }) => renderMergedPlanDateWithStatusChip(
+        row.original.planDeliveryBasicKitPanel, 
+        row.original.actualDeliveryBasicKitPanel,
         row.original.actualDeliveryBasicKitBusbar
     ),
     filterFn: filterByDeliveryStatus,
-  },
+    enableHiding: true, 
+},
+
   {
     accessorKey: "actualDeliveryBasicKitPanel",
     header: ({ column }) => <DataTableColumnHeader column={column} title="Actual Basic Kit (Panel)" />,
@@ -327,24 +350,19 @@ export const columns: ColumnDef<Project>[] = [
     header: ({ column }) => <DataTableColumnHeader column={column} title="FAT Start (All)" />,
     cell: ({ row }) => formatDate(row.original.fatStart),
   },
-  {
-    accessorKey: "planDeliveryAccessoriesPanel",
-    header: ({ column }) => <DataTableColumnHeader column={column} title="Plan Accessories (Panel)" />,
-    cell: ({ row }) => renderPlanDateWithStatusChip(
-        row.original.planDeliveryAccessoriesPanel,
-        row.original.actualDeliveryAccessoriesPanel
-    ),
-    filterFn: filterByDeliveryStatus,
-  },
-  {
-    accessorKey: "planDeliveryAccessoriesBusbar",
-    header: ({ column }) => <DataTableColumnHeader column={column} title="Plan Accessories (Busbar)" />,
-    cell: ({ row }) => renderPlanDateWithStatusChip(
-        row.original.planDeliveryAccessoriesBusbar,
+
+{
+    id: "planAccessories",
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Plan Accessories" />,
+    accessorFn: (row) => row.planDeliveryAccessoriesPanel, 
+    cell: ({ row }) => renderMergedPlanDateWithStatusChip(
+        row.original.planDeliveryAccessoriesPanel, 
+        row.original.actualDeliveryAccessoriesPanel,
         row.original.actualDeliveryAccessoriesBusbar
     ),
     filterFn: filterByDeliveryStatus,
-  },
+    enableHiding: true,
+},
   {
     accessorKey: "actualDeliveryAccessoriesPanel",
     header: ({ column }) => <DataTableColumnHeader column={column} title="Actual Accessories (Panel)" />,
