@@ -196,6 +196,40 @@ export function EditProjectModal({ project, setIsOpen }: EditProjectModalProps) 
     }
   }, [project, isVendor, isPanelVendor, isBusbarVendor]);
 
+  useEffect(() => {
+    if (formData.planStart) {
+      const planBasicKitDate = addDays(formData.planStart, -basicKitOffset);
+      setFormData((prev) => ({
+        ...prev,
+        planDeliveryBasicKitPanel: planBasicKitDate,
+        planDeliveryBasicKitBusbar: planBasicKitDate,
+      }));
+    } else {
+      setFormData((prev) => ({
+        ...prev,
+        planDeliveryBasicKitPanel: null,
+        planDeliveryBasicKitBusbar: null,
+      }));
+    }
+  }, [basicKitOffset, formData.planStart]);
+
+  useEffect(() => {
+    if (formData.fatStart) {
+      const planAccessoriesDate = addDays(formData.fatStart, -accessoriesOffset);
+      setFormData((prev) => ({
+        ...prev,
+        planDeliveryAccessoriesPanel: planAccessoriesDate,
+        planDeliveryAccessoriesBusbar: planAccessoriesDate,
+      }));
+    } else {
+      setFormData((prev) => ({
+        ...prev,
+        planDeliveryAccessoriesPanel: null,
+        planDeliveryAccessoriesBusbar: null,
+      }));
+    }
+  }, [accessoriesOffset, formData.fatStart]);
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value, type } = e.target;
     setFormData((prev) => ({
