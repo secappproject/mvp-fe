@@ -128,6 +128,9 @@ export function EditProjectModal({ project, setIsOpen }: EditProjectModalProps) 
     ),
   });
 
+  const [basicKitOffset, setBasicKitOffset] = useState<number>(7);
+  const [accessoriesOffset, setAccessoriesOffset] = useState<number>(7);
+
   const [step, setStep] = useState(1);
 
   useEffect(() => {
@@ -205,30 +208,11 @@ export function EditProjectModal({ project, setIsOpen }: EditProjectModalProps) 
     setFormData((prev) => ({ ...prev, [id]: value }));
   };
 
-  const handleDateChange = (date: Date | undefined) => {
-    if (date) {
-      const planBasicKitDate = addDays(date, -7);
-      setFormData((prev) => ({
-        ...prev,
-        planStart: date,
-        planDeliveryBasicKitPanel: planBasicKitDate,
-        planDeliveryBasicKitBusbar: planBasicKitDate,
-      }));
-    } else {
-      setFormData((prev) => ({
-        ...prev,
-        planStart: undefined,
-        planDeliveryBasicKitPanel: null,
-        planDeliveryBasicKitBusbar: null, 
-      }));
-    }
-  };
-
   const handleNullableDateChange =
     (field: keyof FormData) => (date: Date | undefined) => {
       if (field === "planStart") {
         if (date) {
-          const planBasicKitDate = addDays(date, -7);
+          const planBasicKitDate = addDays(date, -basicKitOffset);
           setFormData((prev) => ({
             ...prev,
             planStart: date,
@@ -240,15 +224,12 @@ export function EditProjectModal({ project, setIsOpen }: EditProjectModalProps) 
             ...prev,
             planStart: null,
             planDeliveryBasicKitPanel: null,
-            planDeliveryBasicKitBusbar: null, 
+            planDeliveryBasicKitBusbar: null,
           }));
         }
-      } else {
-        setFormData((prev) => ({ ...prev, [field]: date || null }));
-      }
-      if (field === "fatStart") {
+      } else if (field === "fatStart") {
         if (date) {
-          const planAccessoriesDate = addDays(date, -7);
+          const planAccessoriesDate = addDays(date, -accessoriesOffset);
           setFormData((prev) => ({
             ...prev,
             fatStart: date,
@@ -260,7 +241,7 @@ export function EditProjectModal({ project, setIsOpen }: EditProjectModalProps) 
             ...prev,
             fatStart: null,
             planDeliveryAccessoriesPanel: null,
-            planDeliveryAccessoriesBusbar: null, 
+            planDeliveryAccessoriesBusbar: null,
           }));
         }
       } else {
@@ -487,7 +468,6 @@ export function EditProjectModal({ project, setIsOpen }: EditProjectModalProps) 
 
           <TabsContent value="tanggal">
             <div className="flex flex-col gap-4 py-4">
-              
               <NullableDatePicker
                 label="Plan Start"
                 date={formData.planStart}
@@ -500,14 +480,36 @@ export function EditProjectModal({ project, setIsOpen }: EditProjectModalProps) 
                 onDateChange={handleNullableDateChange("fatStart")}
                 disabled={isTanggalDisabled}
               />
+
               <Separator className="my-2" />
+
+              <div className="grid grid-cols-1 gap-2">
+                <Label htmlFor="basicKitOffset" className="text-left">
+                  Offset Basic Kit (H-)
+                </Label>
+                <Input
+                  id="basicKitOffset"
+                  type="number"
+                  value={basicKitOffset}
+                  onChange={(e) =>
+                    setBasicKitOffset(parseInt(e.target.value) || 0)
+                  }
+                  disabled={isTanggalDisabled}
+                  className="w-24"
+                />
+                <p className="text-xs text-muted-foreground -mt-1">
+                  Jarak hari dari Plan Start. Tanggal Plan Basic Kit akan
+                  otomatis diatur.
+                </p>
+              </div>
+
               <NullableDatePicker
                 label="Plan Basic Kit (Panel)"
                 date={formData.planDeliveryBasicKitPanel}
                 onDateChange={handleNullableDateChange(
                   "planDeliveryBasicKitPanel"
                 )}
-                note="Otomatis h-7 dari Plan Start"
+                note={`Otomatis H-${basicKitOffset} dari Plan Start`}
                 disabled
               />
               <NullableDatePicker
@@ -516,7 +518,7 @@ export function EditProjectModal({ project, setIsOpen }: EditProjectModalProps) 
                 onDateChange={handleNullableDateChange(
                   "planDeliveryBasicKitBusbar"
                 )}
-                note="Otomatis h-7 dari Plan Start"
+                note={`Otomatis H-${basicKitOffset} dari Plan Start`}
                 disabled
               />
               <NullableDatePicker
@@ -536,13 +538,34 @@ export function EditProjectModal({ project, setIsOpen }: EditProjectModalProps) 
                 disabled={isTanggalDisabled}
               />
               <Separator className="my-2" />
+
+              <div className="grid grid-cols-1 gap-2">
+                <Label htmlFor="accessoriesOffset" className="text-left">
+                  Offset Accessories (H-)
+                </Label>
+                <Input
+                  id="accessoriesOffset"
+                  type="number"
+                  value={accessoriesOffset}
+                  onChange={(e) =>
+                    setAccessoriesOffset(parseInt(e.target.value) || 0)
+                  }
+                  disabled={isTanggalDisabled}
+                  className="w-24"
+                />
+                <p className="text-xs text-muted-foreground -mt-1">
+                  Jarak hari dari FAT Start. Tanggal Plan Accessories akan
+                  otomatis diatur.
+                </p>
+              </div>
+
               <NullableDatePicker
                 label="Plan Accessories (Panel)"
                 date={formData.planDeliveryAccessoriesPanel}
                 onDateChange={handleNullableDateChange(
                   "planDeliveryAccessoriesPanel"
                 )}
-                note="Otomatis h-7 dari FAT Start"
+                note={`Otomatis H-${accessoriesOffset} dari FAT Start`}
                 disabled
               />
               <NullableDatePicker
@@ -551,7 +574,7 @@ export function EditProjectModal({ project, setIsOpen }: EditProjectModalProps) 
                 onDateChange={handleNullableDateChange(
                   "planDeliveryAccessoriesBusbar"
                 )}
-                note="Otomatis h-7 dari FAT Start"
+                note={`Otomatis H-${accessoriesOffset} dari FAT Start`}
                 disabled
               />
               <NullableDatePicker
@@ -597,7 +620,8 @@ export function EditProjectModal({ project, setIsOpen }: EditProjectModalProps) 
     const busbarStep2Complete = isBusbarVendor
       ? formData.actualDeliveryBasicKitBusbar != null
       : true;
-    const canGoToStep3 = canGoToStep2 && panelStep2Complete && busbarStep2Complete;
+    const canGoToStep3 =
+      canGoToStep2 && panelStep2Complete && busbarStep2Complete;
 
     return (
       <>

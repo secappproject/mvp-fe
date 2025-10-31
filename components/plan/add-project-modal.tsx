@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { format } from "date-fns";
+import { format, addDays } from "date-fns";
 import { Calendar as CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -23,12 +23,13 @@ import {
 import { Calendar } from "@/components/ui/calendar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useAuthStore } from "@/lib/types";
+import { Separator } from "@/components/ui/separator";
 
 interface FormData {
   projectName: string;
   wbs: string;
   planStart: Date | undefined;
-  fatStart: Date | undefined; 
+  fatStart: Date | undefined;
 }
 
 interface AddProjectModalProps {
@@ -42,13 +43,16 @@ const formatNullableDate = (date: Date | null | undefined): string | null => {
 export function AddProjectModal({ setIsOpen }: AddProjectModalProps) {
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
-  
+
   const [formData, setFormData] = useState<FormData>({
     projectName: "",
     wbs: "",
     planStart: new Date(),
-    fatStart: undefined, 
+    fatStart: undefined,
   });
+
+  const [basicKitOffset, setBasicKitOffset] = useState<number>(7);
+  const [accessoriesOffset, setAccessoriesOffset] = useState<number>(7);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value } = e.target;
@@ -61,7 +65,7 @@ export function AddProjectModal({ setIsOpen }: AddProjectModalProps) {
   const handlePlanStartDateChange = (date: Date | undefined) => {
     setFormData((prev) => ({ ...prev, planStart: date }));
   };
-  
+
   const handleFatStartDateChange = (date: Date | undefined) => {
     setFormData((prev) => ({ ...prev, fatStart: date }));
   };
@@ -73,17 +77,29 @@ export function AddProjectModal({ setIsOpen }: AddProjectModalProps) {
     }
     setIsLoading(true);
     try {
+      const planBasicKitDate = formData.planStart
+        ? addDays(formData.planStart, -basicKitOffset)
+        : undefined;
+
+      const planAccessoriesDate = formData.fatStart
+        ? addDays(formData.fatStart, -accessoriesOffset)
+        : undefined;
+
       const payload = {
         projectName: formData.projectName,
         wbs: formData.wbs,
         planStart: format(formData.planStart, "yyyy-MM-dd"),
         fatStart: formatNullableDate(formData.fatStart),
-        quantity: 0, 
-        category: "PIX", 
+        quantity: 0,
+        category: "PIX",
         vendorPanel: "",
         vendorBusbar: "",
         panelProgress: 0,
         statusBusbar: "Punching/Bending",
+        planDeliveryBasicKitPanel: formatNullableDate(planBasicKitDate),
+        planDeliveryBasicKitBusbar: formatNullableDate(planBasicKitDate),
+        planDeliveryAccessoriesPanel: formatNullableDate(planAccessoriesDate),
+        planDeliveryAccessoriesBusbar: formatNullableDate(planAccessoriesDate),
       };
 
       const role = useAuthStore.getState().role;
@@ -177,7 +193,7 @@ export function AddProjectModal({ setIsOpen }: AddProjectModalProps) {
               </PopoverContent>
             </Popover>
           </div>
-          
+
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="fatStart" className="text-left">
               FAT Start
@@ -210,6 +226,43 @@ export function AddProjectModal({ setIsOpen }: AddProjectModalProps) {
             </Popover>
           </div>
 
+          <Separator className="my-2" />
+
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="basicKitOffset" className="text-left col-span-4">
+              Offset Basic Kit (H-)
+              <p className="text-xs text-muted-foreground font-light">
+                Jarak hari dari Plan Start.
+              </p>
+            </Label>
+            <Input
+              id="basicKitOffset"
+              type="number"
+              value={basicKitOffset}
+              onChange={(e) =>
+                setBasicKitOffset(parseInt(e.target.value) || 0)
+              }
+              className="col-span-2"
+            />
+          </div>
+
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="accessoriesOffset" className="text-left col-span-4">
+              Offset Accessories (H-)
+              <p className="text-xs text-muted-foreground font-light">
+                Jarak hari dari FAT Start.
+              </p>
+            </Label>
+            <Input
+              id="accessoriesOffset"
+              type="number"
+              value={accessoriesOffset}
+              onChange={(e) =>
+                setAccessoriesOffset(parseInt(e.target.value) || 0)
+              }
+              className="col-span-2"
+            />
+          </div>
         </div>
       </ScrollArea>
 
