@@ -207,7 +207,7 @@ export function EditProjectModal({ project, setIsOpen }: EditProjectModalProps) 
 
   const handleDateChange = (date: Date | undefined) => {
     if (date) {
-      const planBasicKitDate = addDays(date, 7);
+      const planBasicKitDate = addDays(date, -7);
       setFormData((prev) => ({
         ...prev,
         planStart: date,
@@ -228,7 +228,7 @@ export function EditProjectModal({ project, setIsOpen }: EditProjectModalProps) 
     (field: keyof FormData) => (date: Date | undefined) => {
       if (field === "planStart") {
         if (date) {
-          const planBasicKitDate = addDays(date, 7);
+          const planBasicKitDate = addDays(date, -7);
           setFormData((prev) => ({
             ...prev,
             planStart: date,
