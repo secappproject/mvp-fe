@@ -248,7 +248,7 @@ export function EditProjectModal({ project, setIsOpen }: EditProjectModalProps) 
       }
       if (field === "fatStart") {
         if (date) {
-          const planAccessoriesDate = addDays(date, 7);
+          const planAccessoriesDate = addDays(date, -7);
           setFormData((prev) => ({
             ...prev,
             fatStart: date,
