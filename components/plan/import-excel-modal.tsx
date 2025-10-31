@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, FileCheck2, Download } from "lucide-react"; // Ditambahkan Download
+import { Loader2, FileCheck2, Download } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 
@@ -68,56 +68,34 @@ export function ImportExcelModal({
     }
   };
 
-  // --- FUNGSI BARU UNTUK DOWNLOAD TEMPLATE ---
   const handleDownloadTemplate = () => {
+    // Sesuai permintaan: hanya 8 kolom
     const headers = [
       "Project Name",
       "WBS",
       "Category",
       "Qty",
-      "Vendor Panel",
-      "Vendor Busbar",
       "Progress Panel",
       "Status Busbar",
       "Plan Start",
       "FAT Start",
-      "Plan Basic Kit (Panel)",
-      "Plan Basic Kit (Busbar)",
-      "Actual Basic Kit (Panel)",
-      "Actual Basic Kit (Busbar)",
-      "Plan Accessories (Panel)",
-      "Plan Accessories (Busbar)",
-      "Actual Accessories (Panel)",
-      "Actual Accessories (Busbar)",
     ];
 
-    // Data contoh untuk memandu pengguna
     const sampleData = [
       {
         "Project Name": "Contoh Proyek",
         "WBS": "WBS-12345",
         "Category": "PIX",
         "Qty": 1,
-        "Vendor Panel": "Vendor A",
-        "Vendor Busbar": "Vendor B",
         "Progress Panel": 0,
         "Status Busbar": "Punching/Bending",
         "Plan Start": "2025-12-01", // Format YYYY-MM-DD
         "FAT Start": "2025-12-15", // Format YYYY-MM-DD
-        "Plan Basic Kit (Panel)": "", // Kosongkan agar dihitung otomatis dari offset
-        "Plan Basic Kit (Busbar)": "",
-        "Actual Basic Kit (Panel)": "",
-        "Actual Basic Kit (Busbar)": "",
-        "Plan Accessories (Panel)": "", // Kosongkan agar dihitung otomatis dari offset
-        "Plan Accessories (Busbar)": "",
-        "Actual Accessories (Panel)": "",
-        "Actual Accessories (Busbar)": "",
       },
     ];
 
     const worksheet = XLSX.utils.json_to_sheet(sampleData, { header: headers });
 
-    // Atur lebar kolom (opsional)
     worksheet["!cols"] = headers.map((h) => ({ wch: h.length + 5 }));
 
     const workbook = XLSX.utils.book_new();
@@ -125,7 +103,6 @@ export function ImportExcelModal({
 
     XLSX.writeFile(workbook, "Template_Impor_Proyek.xlsx");
   };
-  // --- BATAS FUNGSI BARU ---
 
   const handleImport = async () => {
     if (!file) {
@@ -148,6 +125,8 @@ export function ImportExcelModal({
             const planStart = parseExcelDate(row["Plan Start"]);
             const fatStart = parseExcelDate(row["FAT Start"]);
 
+            // Kolom-kolom ini akan 'undefined' jika tidak ada di template,
+            // dan itu tidak masalah
             const planBasicKit =
               parseExcelDate(row["Plan Basic Kit (Panel)"]) ||
               parseExcelDate(row["Plan Basic Kit (Busbar)"]);
@@ -155,6 +134,7 @@ export function ImportExcelModal({
               parseExcelDate(row["Plan Accessories (Panel)"]) ||
               parseExcelDate(row["Plan Accessories (Busbar)"]);
 
+            // Logika offset akan tetap berjalan
             const finalPlanBasicKit =
               planBasicKit ??
               (planStart ? addDays(planStart, -basicKitOffset) : null);
@@ -167,8 +147,8 @@ export function ImportExcelModal({
               wbs: String(row["WBS"] || ""),
               category: row["Category"] || "PIX",
               quantity: Number(row["Qty"] || 0),
-              vendorPanel: row["Vendor Panel"] || "",
-              vendorBusbar: row["Vendor Busbar"] || "",
+              vendorPanel: row["Vendor Panel"] || "", // Akan jadi "" jika tdk ada di Excel
+              vendorBusbar: row["Vendor Busbar"] || "", // Akan jadi "" jika tdk ada di Excel
               panelProgress: Number(row["Progress Panel"] || 0),
               statusBusbar: row["Status Busbar"] || "Punching/Bending",
               planStart: formatDateForPayload(planStart),
@@ -251,7 +231,6 @@ export function ImportExcelModal({
             Unggah file Excel (.xlsx) untuk menambah atau memperbarui data
             proyek secara massal.
           </DialogDescription>
-          {/* --- TOMBOL DOWNLOAD TEMPLATE --- */}
           <Button
             variant="link"
             size="sm"
@@ -261,7 +240,6 @@ export function ImportExcelModal({
             <Download className="w-4 h-4 mr-2" />
             Unduh Templat Impor
           </Button>
-          {/* --- BATAS TOMBOL --- */}
         </DialogHeader>
 
         <ScrollArea className="max-h-[60vh] pr-6">
@@ -287,8 +265,8 @@ export function ImportExcelModal({
 
             <h4 className="font-semibold text-sm">Pengaturan Offset</h4>
             <p className="text-xs text-muted-foreground -mt-3">
-              Jika tanggal plan (Basic Kit/Accessories) kosong di Excel, tanggal
-              akan dihitung otomatis menggunakan offset ini.
+              Tanggal plan (Basic Kit/Accessories) akan dihitung otomatis
+              menggunakan offset ini.
             </p>
 
             <div className="grid grid-cols-2 items-center gap-4">
