@@ -28,7 +28,6 @@ const formatDate = (dateVal: string | null): string => {
   return '';
 };
 
-// --- FUNGSI YANG DIPERBARUI ---
 export const getDeliveryStatus = (
   planDateStr: string | null,
   actualDateStr: string | null
@@ -39,33 +38,25 @@ export const getDeliveryStatus = (
   try {
     const planDate = startOfDay(parseISO(planDateStr));
 
-    // 1. Logika untuk item yang SUDAH DI-DELIVER (actualDateStr ada)
     if (actualDateStr) {
       const actualDate = startOfDay(parseISO(actualDateStr));
       if (isAfter(actualDate, planDate)) {
-        return "Late"; // Dikirim terlambat
+        return "Late"; 
       }
-      return "Delivered"; // Dikirim tepat waktu (atau lebih cepat)
+      return "Delivered"; 
     }
 
-    // 2. Logika untuk item yang BELUM DI-DELIVER (actualDateStr is null)
-    
-    // Cek jika Overdue (Late)
-    // (planDate di masa lalu, dan bukan hari ini)
     if (isPast(planDate) && !isToday(planDate)) {
-      return "Late"; // Overdue
+      return "Late"; 
     } 
     
-    // Sesuai permintaan: "klo blm ada tanggal actual dan belum overdue, maka need to delivery"
-    // Ini mencakup planDate = hari ini, atau planDate di masa depan.
     return "Need Delivery"; 
 
   } catch (e) {
     console.warn("Error calculating delivery status:", planDateStr);
   }
-  return null; // Fallback
+  return null; 
 };
-// --- BATAS FUNGSI YANG DIPERBARUI ---
 
 
 const renderPlanDateWithStatusChip = (
@@ -73,8 +64,6 @@ const renderPlanDateWithStatusChip = (
     actualDateStr: string | null
 ) => {
     const formattedPlanDate = formatDate(planDateStr);
-    // getDeliveryStatus sekarang akan mengembalikan "Need Delivery" untuk semua
-    // item yang belum terkirim dan belum terlambat.
     const status = getDeliveryStatus(planDateStr, actualDateStr); 
     let statusChip: React.ReactNode = null;
 
@@ -97,13 +86,10 @@ const renderPlanDateWithStatusChip = (
     const showLateChipUndelivered = status === "Late"; 
 
     if (showLateChipDelivered || showLateChipUndelivered) { 
-        // 1. Prioritas: Late
         statusChip = <span className="ml-2 px-2 py-0.5 text-xs font-semibold rounded-full bg-red-100 text-red-700">Late</span>
     } else if (status === "Need Delivery") {
-        // 2. Prioritas: Need Delivery (sekarang mencakup semua yang belum dikirim & belum telat)
         statusChip = <span className="ml-2 px-2 py-0.5 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">Need Delivery</span>;
     } else if (status === "On Track" || status === "Delivered") { 
-        // 3. Default: On Track (hanya akan muncul jika status="Delivered" dan tidak telat)
         statusChip = <span className="ml-2 px-2 py-0.5 text-xs font-semibold rounded-full bg-green-100 text-green-800">On Track</span>;
     }
 
@@ -131,11 +117,8 @@ export const filterByDeliveryStatus: FilterFn<Project> = (row, _columnId, filter
 
     for (const item of items) {
         if (!item.actual) {
-            // Cek status untuk yang belum dikirim
-            // getDeliveryStatus akan mengembalikan 'Late' or 'Need Delivery'
             statuses.push(getDeliveryStatus(item.plan, null));
         } else if (item.plan && item.actual && filterValue.includes("Late")) {
-            // Khusus untuk filter "Late", cek juga yang sudah dikirim tapi telat
             try {
                 const planDate = startOfDay(parseISO(item.plan));
                 const actualDate = startOfDay(parseISO(item.actual));
@@ -144,19 +127,16 @@ export const filterByDeliveryStatus: FilterFn<Project> = (row, _columnId, filter
                 }
             } catch(e)  {}
         } else if (item.plan && item.actual && filterValue.includes("On Track")) {
-             // Jika filter "On Track", masukkan juga yang "Delivered" (tepat waktu)
              try {
                 const planDate = startOfDay(parseISO(item.plan));
                 const actualDate = startOfDay(parseISO(item.actual));
                 if (!isAfter(actualDate, planDate)) {
-                    // Jika "Delivered" dan tidak "Late", anggap sebagai "On Track" untuk filter
                     statuses.push("On Track"); 
                 }
             } catch(e)  {}
         }
     }
 
-    // Jika filter "On Track", kita juga ingin memasukkan "Delivered"
     if (filterValue.includes("On Track")) {
          return statuses.some(status => status && (filterValue.includes(status) || status === "Delivered"));
     }
@@ -234,11 +214,32 @@ export const columns: ColumnDef<Project>[] = [
     header: ({ column }) => <DataTableColumnHeader column={column} title="Progress Panel" />,
     cell: ({ row }) => {
       const progress: number = row.original.panelProgress;
+      
+      const { 
+        actualDeliveryBasicKitPanel, 
+        actualDeliveryBasicKitBusbar, 
+        actualDeliveryAccessoriesPanel, 
+        actualDeliveryAccessoriesBusbar 
+      } = row.original;
+
+      const isAllDelivered = 
+        actualDeliveryBasicKitPanel && 
+        actualDeliveryBasicKitBusbar && 
+        actualDeliveryAccessoriesPanel && 
+        actualDeliveryAccessoriesBusbar;
+
       let barColorClass = "";
-      if (progress === 100) barColorClass = "bg-[#008A15]";
-      else if (progress >= 75) barColorClass = "bg-blue-500";
-      else if (progress >= 50) barColorClass = "bg-orange-500";
-      else barColorClass = "bg-red-500";
+      
+      if (isAllDelivered) {
+        barColorClass = "bg-[#008A15]";
+      } else if (progress >= 75) { 
+        barColorClass = "bg-blue-500";
+      } else if (progress >= 50) {
+        barColorClass = "bg-orange-500";
+      } else {
+        barColorClass = "bg-red-500";
+      }
+
       return (
         <div className="flex items-center gap-2">
           <span className="w-10 text-right text-sm">{progress}%</span>
@@ -366,7 +367,7 @@ export const columns: ColumnDef<Project>[] = [
         getDeliveryStatus(row.planDeliveryAccessoriesBusbar, row.actualDeliveryAccessoriesBusbar),
       ];
       return statuses.map(s => {
-        if (s === 'Delivered') return 'on track'; // 'Delivered' (tepat waktu) dihitung sbg 'on track'
+        if (s === 'Delivered') return 'on track'; 
         return s?.toLowerCase() ?? '';
       }).filter(s => s && s !== 'delivered').join(' ');
     },

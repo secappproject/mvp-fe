@@ -34,6 +34,9 @@ import { Project, useAuthStore } from "@/lib/types";
 import * as XLSX from "xlsx";
 import { filterByDeliveryStatus } from "../plan/columns";
 import { cn } from "@/lib/utils"; 
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { parseISO, startOfDay, differenceInCalendarDays, max } from 'date-fns';
 
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
@@ -167,6 +170,59 @@ export function DataTable<TData extends Project, TValue>({ columns, data }: Data
   const [inputValue, setInputValue] = React.useState("");
   const [filterChips, setFilterChips] = React.useState<string[]>([]);
   const [activeStatusFilter, setActiveStatusFilter] = React.useState<DeliveryStatus | null>(null);
+  const [showOldClosed, setShowOldClosed] = React.useState(false);
+
+  const filteredData = React.useMemo(() => {
+    if (showOldClosed) {
+      return data; 
+    }
+
+    const today = startOfDay(new Date());
+
+    return data.filter(item => {
+      const project = item as Project; 
+      
+      const { 
+        actualDeliveryBasicKitPanel, 
+        actualDeliveryBasicKitBusbar, 
+        actualDeliveryAccessoriesPanel, 
+        actualDeliveryAccessoriesBusbar 
+      } = project;
+
+      const isAllDelivered = 
+        actualDeliveryBasicKitPanel && 
+        actualDeliveryBasicKitBusbar && 
+        actualDeliveryAccessoriesPanel && 
+        actualDeliveryAccessoriesBusbar;
+
+      if (!isAllDelivered) {
+        return true; 
+      }
+
+      try {
+        const dates = [
+          parseISO(actualDeliveryBasicKitPanel!),
+          parseISO(actualDeliveryBasicKitBusbar!),
+          parseISO(actualDeliveryAccessoriesPanel!),
+          parseISO(actualDeliveryAccessoriesBusbar!)
+        ];
+        
+        const lastDeliveryDate = startOfDay(max(dates));
+        const diffDays = differenceInCalendarDays(today, lastDeliveryDate);
+
+        if (diffDays > 2) { 
+          return false;
+        }
+
+      } catch (e) {
+        console.warn("Error parsing delivery dates for filtering:", project.wbs, e);
+        return true; 
+      }
+
+      return true;
+    });
+  }, [data, showOldClosed]);
+
 
   const multiWordFilterFn: FilterFn<TData> = (row, _columnId, filterValue) => {
     const filterWords = String(filterValue).toLowerCase().split(" ").filter(Boolean);
@@ -183,7 +239,7 @@ export function DataTable<TData extends Project, TValue>({ columns, data }: Data
 
 
   const table = useReactTable<TData>({
-    data,
+    data: filteredData, 
     columns,
     state: {
       sorting,
@@ -315,7 +371,20 @@ export function DataTable<TData extends Project, TValue>({ columns, data }: Data
           </div>
         </div>
 
-        <TableAddButton />
+        <div className="flex flex-col items-end gap-2">
+          <TableAddButton />
+          
+          <div className="flex items-center space-x-2 pt-1">
+            <Switch
+              id="show-old-closed"
+              checked={showOldClosed}
+              onCheckedChange={(checked) => setShowOldClosed(checked as boolean)}
+            />
+            <Label htmlFor="show-old-closed" className="text-sm text-black text-muted-foreground">
+              Include 2+ Days Closed
+            </Label>
+          </div>
+        </div>
 
       </div>
 
